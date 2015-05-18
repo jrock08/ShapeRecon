@@ -1,0 +1,7 @@
+*~
+Deformations
+/Main/*.mat
+/Main/Result_Images*
+/Main/Result_Videos*
+/Main/DataFiles
+/Main/sharded_text_output/

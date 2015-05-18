@@ -1,0 +1,4 @@
+Code modified based on Andrej Karpathy's implementation of random forest.
+Modified and re-distributed under BSD license of the original code.
+
+https://github.com/karpathy/Random-Forest-Matlab

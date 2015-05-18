@@ -1,0 +1,405 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      --><title>PAR TIC-TOC</title><meta name="generator" content="MATLAB 7.10"><meta name="date" content="2010-05-04"><meta name="m-file" content="Example_Script"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>PAR TIC-TOC</h1><!--introduction--><p>This file demonstrates how to use the Par class object to time the execution time of each <tt>PARFOR</tt> loop. Here are the steps.</p><div><ol><li>Construct a Par object, with the number of iterations as the input. This constructs the object.</li><li>Call Par.tic just inside the PARFOR loop. This records the start time of the iteration.</li><li>Call Par.toc just before the end of the PARFOR loop. Store the output to the appropriate index of the Par object. This is necessary for PARFOR to recognize that the variable is sliced.</li><li>Stop the measurement. This records the final end time.</li><li>Visualize.</li></ol></div><pre>     p = Par(n);                   (1)
+     parfor id = 1:n
+         Par.tic;                  (2)</pre><pre>         &lt;usual computations&gt;</pre><pre>         p(id) = Par.toc;          (3)
+     end
+     stop(p);                      (4)</pre><pre>     plot(p);                      (5)</pre><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Setting Up Default Cluster Config to Local</a></li><li><a href="#2">PARFOR-LOOP with No Workers</a></li><li><a href="#3">PARFOR with 2 Local Workers</a></li><li><a href="#4">Using a Cluster (minimal data transfer)</a></li><li><a href="#5">Using a Cluster (large data transfer)</a></li><li><a href="#6">Parameter Sweep (Serial vs Parallel)</a></li><li><a href="#7">Concatenation of Par objects</a></li></ul></div><h2>Setting Up Default Cluster Config to Local<a name="1"></a></h2><pre class="codeinput">clear
+
+clusterConfig1 = <span class="string">'local'</span>;
+clusterConfig2 = <span class="string">'local'</span>;
+<span class="comment">% Change to your neighborhood cluster if available.</span>
+<span class="comment">% clusterConfig2 = 'speedy';</span>
+</pre><h2>PARFOR-LOOP with No Workers<a name="2"></a></h2><pre class="codeinput">n = 40;
+y = randi([500, 600], 1, n);
+a = zeros(n,1);
+
+<span class="comment">% PARFOR-Loop (no workers)</span>
+<span class="keyword">if</span> matlabpool(<span class="string">'size'</span>) &gt; 0, matlabpool <span class="string">close</span>, <span class="keyword">end</span>
+
+p1 = Par(n);
+
+<span class="keyword">parfor</span> id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p1(id) = Par.toc;
+<span class="keyword">end</span>
+
+stop(p1);
+
+plot(p1);
+
+<span class="comment">% Plot using optional colormap input</span>
+<span class="comment">% plot(p1,@bone);</span>
+</pre><img vspace="5" hspace="5" src="Example_Script_01.png" alt=""> <h2>PARFOR with 2 Local Workers<a name="3"></a></h2><pre class="codeinput">matlabpool(<span class="string">'open'</span>, clusterConfig1, 2)
+
+p2 = Par(n);
+<span class="keyword">parfor</span> id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p2(id) = Par.toc;
+<span class="keyword">end</span>
+stop(p2);
+
+<span class="comment">% Plot comparing with no workers</span>
+plot(p2, p1);
+
+<span class="comment">% Plot comparing with no workers using optional colormap input</span>
+<span class="comment">% plot(p2, p1, @cool);</span>
+
+matlabpool <span class="string">close</span>;
+</pre><pre class="codeoutput">Starting matlabpool using the 'local' configuration ... connected to 2 labs.
+Sending a stop signal to all the labs ... stopped.
+</pre><img vspace="5" hspace="5" src="Example_Script_02.png" alt=""> <h2>Using a Cluster (minimal data transfer)<a name="4"></a></h2><p>This example uses a cluster. The random-sized matrices are generated within the loop so not much data is transfered to the workers.</p><pre class="codeinput">n = 40;
+
+<span class="comment">% Generate series of random numbers</span>
+y = randi([600, 1200], 1, n);
+
+<span class="comment">% Run on cluster, use a cluster configuration</span>
+matlabpool(<span class="string">'open'</span>, clusterConfig2, 2, <span class="string">'FileDependencies'</span>, {<span class="string">'Par.m'</span>});
+
+p = Par(n);
+<span class="keyword">parfor</span> id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p(id) = Par.toc;
+<span class="keyword">end</span>
+stop(p);
+
+plot(p);
+
+<span class="comment">% Plot using optional colormap input</span>
+<span class="comment">% plot(p,@hot);</span>
+</pre><pre class="codeoutput">Starting matlabpool using the 'local' configuration ... connected to 2 labs.
+</pre><img vspace="5" hspace="5" src="Example_Script_03.png" alt=""> <h2>Using a Cluster (large data transfer)<a name="5"></a></h2><p>Now we generate the random-sized matrices outside of the loop and pass them to the cluster.</p><pre class="codeinput"><span class="comment">% Generate series of random-sized matrices</span>
+yy = arrayfun(@(x) rand(x), y, <span class="string">'UniformOutput'</span>, false);
+
+p = Par(n);
+<span class="keyword">parfor</span> id = 1:n
+  Par.tic;
+
+  a(id) = max(svd(yy{id}));
+
+  p(id) = Par.toc;
+<span class="keyword">end</span>
+stop(p);
+
+<span class="comment">% Plot using default colormap input</span>
+plot(p);
+
+<span class="comment">% Plot using optional colormap input</span>
+<span class="comment">% plot(p,@bone);</span>
+
+matlabpool <span class="string">close</span>
+</pre><pre class="codeoutput">Sending a stop signal to all the labs ... stopped.
+</pre><img vspace="5" hspace="5" src="Example_Script_04.png" alt=""> <h2>Parameter Sweep (Serial vs Parallel)<a name="6"></a></h2><p>Run the parameter sweep example and compare serial and parallel.</p><pre class="codeinput"><span class="comment">% Run in serial</span>
+p_serial = sweepExample();
+
+<span class="comment">% Run on cluster, use a cluster configuration</span>
+<span class="comment">% defaultParallelConfig('speedy');</span>
+
+<span class="comment">% Run in parallel</span>
+matlabpool(<span class="string">'open'</span>, clusterConfig2, 2, <span class="string">'FileDependencies'</span>, {<span class="string">'Par.m'</span>, <span class="string">'sweepExample.m'</span>});
+
+<span class="comment">% May want to use more workers</span>
+<span class="comment">% matlabpool('open', clusterConfig2, 4, 'FileDependencies', {'Par.m','sweepExample.m'});</span>
+
+p_parallel = sweepExample();
+
+<span class="comment">% Plot comparison using default colormap input</span>
+<span class="comment">% plot(p_parallel, p_serial);</span>
+
+<span class="comment">% Plot comparison using optional colormap input</span>
+plot(p_parallel, p_serial,@jet);
+
+matlabpool <span class="string">close</span>;
+</pre><pre class="codeoutput">Starting matlabpool using the 'local' configuration ... connected to 2 labs.
+Sending a stop signal to all the labs ... stopped.
+</pre><img vspace="5" hspace="5" src="Example_Script_05.png" alt=""> <h2>Concatenation of Par objects<a name="7"></a></h2><p>Results of multiple parfor loops can be concatenated to see total efficency for the parallel part of the calculation.</p><pre class="codeinput"><span class="comment">% Run in parallel on local cluster</span>
+
+matlabpool(<span class="string">'open'</span>, clusterConfig1, 2, <span class="string">'FileDependencies'</span>, {<span class="string">'Par.m'</span>});
+
+n = 40;
+y = randi([500, 600], 1, n);
+a = zeros(n,1);
+
+<span class="comment">% PARFOR-Loop (no workers)</span>
+pTotal = [];
+<span class="keyword">for</span> ii = 1:5
+  yy = arrayfun(@(x) rand(x), y, <span class="string">'UniformOutput'</span>, false);
+
+  p = Par(n);
+  <span class="keyword">parfor</span> id = 1:n
+    Par.tic;
+
+    a(id) = max(svd(yy{id}));
+
+    p(id) = Par.toc;
+  <span class="keyword">end</span>
+  stop(p);
+
+  pTotal = [pTotal, p];
+
+<span class="keyword">end</span>
+
+plot(pTotal);
+matlabpool <span class="string">close</span>;
+</pre><pre class="codeoutput">Starting matlabpool using the 'local' configuration ... connected to 2 labs.
+Sending a stop signal to all the labs ... stopped.
+</pre><img vspace="5" hspace="5" src="Example_Script_06.png" alt=""> <p class="footer">Copyright 2010 The MathWorks, Inc.<br>
+      Published with MATLAB&reg; 7.10<br></p></div><!--
+##### SOURCE BEGIN #####
+%% PAR TIC-TOC
+% This file demonstrates how to use the Par class object to time the
+% execution time of each |PARFOR| loop. Here are the steps.
+%
+% # Construct a Par object, with the number of iterations as the input.
+% This constructs the object.
+% # Call Par.tic just inside the PARFOR loop. This records the start time
+% of the iteration.
+% # Call Par.toc just before the end of the PARFOR loop. Store the output
+% to the appropriate index of the Par object. This is necessary for PARFOR
+% to recognize that the variable is sliced.
+% # Stop the measurement. This records the final end time.
+% # Visualize.
+%
+%       p = Par(n);                   (1)
+%       parfor id = 1:n
+%           Par.tic;                  (2)
+%
+%           <usual computations>
+%
+%           p(id) = Par.toc;          (3)
+%       end
+%       stop(p);                      (4)
+%
+%       plot(p);                      (5)
+
+%   Copyright 2010 The MathWorks, Inc.
+
+%% Setting Up Default Cluster Config to Local
+clear
+
+clusterConfig1 = 'local';
+clusterConfig2 = 'local';
+% Change to your neighborhood cluster if available.
+% clusterConfig2 = 'speedy';  
+
+%% PARFOR-LOOP with No Workers
+
+n = 40;
+y = randi([500, 600], 1, n);
+a = zeros(n,1);
+
+% PARFOR-Loop (no workers)
+if matlabpool('size') > 0, matlabpool close, end
+
+p1 = Par(n);
+
+parfor id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p1(id) = Par.toc;
+end
+
+stop(p1);
+
+plot(p1);
+
+% Plot using optional colormap input
+% plot(p1,@bone);
+
+%% PARFOR with 2 Local Workers
+
+matlabpool('open', clusterConfig1, 2)
+
+p2 = Par(n);
+parfor id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p2(id) = Par.toc;
+end
+stop(p2);
+
+% Plot comparing with no workers
+plot(p2, p1);
+
+% Plot comparing with no workers using optional colormap input
+% plot(p2, p1, @cool);
+
+matlabpool close;
+
+%% Using a Cluster (minimal data transfer)
+% This example uses a cluster. The random-sized matrices are generated within
+% the loop so not much data is transfered to the workers.
+
+n = 40;
+
+% Generate series of random numbers
+y = randi([600, 1200], 1, n);
+
+% Run on cluster, use a cluster configuration
+matlabpool('open', clusterConfig2, 2, 'FileDependencies', {'Par.m'});
+
+p = Par(n);
+parfor id = 1:n
+  Par.tic;
+  a(id) = max(svd(rand(y(id))));
+  p(id) = Par.toc;
+end
+stop(p);
+
+plot(p);
+
+% Plot using optional colormap input
+% plot(p,@hot);
+
+%% Using a Cluster (large data transfer)
+% Now we generate the random-sized matrices outside of the loop and pass
+% them to the cluster.
+
+% Generate series of random-sized matrices
+yy = arrayfun(@(x) rand(x), y, 'UniformOutput', false);
+
+p = Par(n);
+parfor id = 1:n
+  Par.tic;
+  
+  a(id) = max(svd(yy{id}));
+  
+  p(id) = Par.toc;
+end
+stop(p);
+
+% Plot using default colormap input
+plot(p);
+
+% Plot using optional colormap input
+% plot(p,@bone);
+
+matlabpool close
+
+%% Parameter Sweep (Serial vs Parallel)
+% Run the parameter sweep example and compare serial and parallel.
+
+% Run in serial
+p_serial = sweepExample();
+
+% Run on cluster, use a cluster configuration
+% defaultParallelConfig('speedy');
+
+% Run in parallel
+matlabpool('open', clusterConfig2, 2, 'FileDependencies', {'Par.m', 'sweepExample.m'});
+
+% May want to use more workers
+% matlabpool('open', clusterConfig2, 4, 'FileDependencies', {'Par.m','sweepExample.m'});
+
+p_parallel = sweepExample();
+
+% Plot comparison using default colormap input
+% plot(p_parallel, p_serial);
+
+% Plot comparison using optional colormap input
+plot(p_parallel, p_serial,@jet);
+
+matlabpool close;
+
+%% Concatenation of Par objects
+% Results of multiple parfor loops can be concatenated to see
+% total efficency for the parallel part of the calculation.
+
+% Run in parallel on local cluster
+
+matlabpool('open', clusterConfig1, 2, 'FileDependencies', {'Par.m'});
+
+n = 40;
+y = randi([500, 600], 1, n);
+a = zeros(n,1);
+
+% PARFOR-Loop (no workers)
+pTotal = [];
+for ii = 1:5
+  yy = arrayfun(@(x) rand(x), y, 'UniformOutput', false);
+  
+  p = Par(n);
+  parfor id = 1:n
+    Par.tic;
+    
+    a(id) = max(svd(yy{id}));
+    
+    p(id) = Par.toc;
+  end
+  stop(p);
+  
+  pTotal = [pTotal, p];
+
+end
+
+plot(pTotal);
+matlabpool close;
+
+
+##### SOURCE END #####
+--></body></html>
